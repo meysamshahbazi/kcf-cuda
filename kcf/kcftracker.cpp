@@ -86,6 +86,8 @@ the use of this software, even if advised of the possibility of such damage.
 #include "recttools.hpp"
 #include "fhog.hpp"
 #include "labdata.hpp"
+#include <iostream>
+using namespace std;
 #endif
 
 namespace kcf
@@ -185,13 +187,17 @@ void KCFTracker::init(const cv::Mat image, const cv::Rect2d &roi)
 {
     _roi = roi;
     assert(roi.width >= 0 && roi.height >= 0);
+    
     _tmpl = getFeatures(image, 1);
+    
     _prob = createGaussianPeak(_size_patch[0], _size_patch[1]);
+    
     _alphaf = cv::Mat(_size_patch[0], _size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_den = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
+    
     train(_tmpl, 1.0); // train with initial frame
-
+    
     if (_dsst)
     {
         init_dsst(image, roi);
@@ -470,7 +476,7 @@ cv::Mat KCFTracker::gaussianCorrelation(cv::Mat x1, cv::Mat x2) // KCF (30)
 // Create Gaussian Peak. Function called only in the first frame.
 cv::Mat KCFTracker::createGaussianPeak(int sizey, int sizex)
 {
-
+    
     cv::Mat_<float> res(sizey, sizex);
 
     int syh = (sizey) / 2;
@@ -510,7 +516,7 @@ cv::Mat KCFTracker::createGaussianPeak(int sizey, int sizex)
 cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale_adjust)
 {
     cv::Rect extracted_roi;
-
+    
     //printf("_roi:%f,%f,%f,%f\n",_roi.x,_roi.y,_roi.width,_roi.height);
     // get the centor of roi
     float cx = _roi.x + _roi.width / 2;
@@ -561,6 +567,7 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
             _tmpl_sz.height = (_tmpl_sz.height / 2) * 2;
         }
     }
+    
 
     // get new extracted_roi
     //printf("c:%f,%f,%d,%d,%f,%f\n", scale_adjust, _scale, _tmpl_sz.width, _tmpl_sz.height, cx, cy);
@@ -581,7 +588,6 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
         extracted_roi.width = 2;
     if (extracted_roi.height <= 0)
         extracted_roi.height = 2;
-
     //printf("extracted_roi:%d,%d,%d,%d\n", extracted_roi.x, extracted_roi.y, extracted_roi.width, extracted_roi.height);
     cv::Mat FeaturesMap;
     cv::Mat z = subwindow(image, extracted_roi, cv::BORDER_REPLICATE);
@@ -590,14 +596,16 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
     {
         cv::resize(z, z, _tmpl_sz);
     }
+    
     //printf("%d, %d \n", z.cols, z.rows);
     //double timereco = (double)cv::getTickCount();
 	//float fpseco = 0;
     // HOG features
-    if (_hogfeatures)
-    {
+    if (_hogfeatures) {
+        
         cv::Mat z_ipl = z;
         CvLSVMFeatureMapCaskade *map;
+        
         getFeatureMaps(z_ipl, cell_size, &map);
         normalizeAndTruncate(map, 0.2f);
         PCAFeatureMaps(map);
@@ -607,13 +615,14 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
 
         FeaturesMap = cv::Mat(cv::Size(map->numFeatures, map->sizeX * map->sizeY), CV_32F, map->map); // Procedure do deal with cv::Mat multichannel bug
         FeaturesMap = FeaturesMap.t();                                                                // transpose
+        
         freeFeatureMapObject(&map);
-
         // Lab features
         if (_labfeatures)
         {
             cv::Mat imgLab;
-            cvtColor(z, imgLab, CV_BGR2Lab);
+            
+            cvtColor(z, imgLab,cv::COLOR_BGR2Lab /* CV_BGR2Lab */);
             unsigned char *input = (unsigned char *)(imgLab.data);
 
             // Sparse output vector
@@ -621,6 +630,7 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
 
             int cntCell = 0;
             // Iterate through each cell
+            
             for (int cY = cell_size; cY < z.rows - cell_size; cY += cell_size)
             {
                 for (int cX = cell_size; cX < z.cols - cell_size; cX += cell_size)
@@ -639,6 +649,7 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
                             float minDist = FLT_MAX;
                             int minIdx = 0;
                             float *inputCentroid = (float *)(_labCentroids.data);
+                            
                             for (int k = 0; k < _labCentroids.rows; ++k)
                             {
                                 float dist = ((l - inputCentroid[3 * k]) * (l - inputCentroid[3 * k])) +
@@ -658,11 +669,13 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
                     cntCell++;
                 }
             }
+            
             // Update size_patch[2] and stack lab features to FeaturesMap
             _size_patch[2] += _labCentroids.rows;
             FeaturesMap.push_back(outputLab);
         }
     }
+    
     else //CSK
     {
         FeaturesMap = getGrayImage(z);
@@ -671,6 +684,7 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
         _size_patch[1] = z.cols;
         _size_patch[2] = 1;
     }
+    
 	//fpseco = ((double)cv::getTickCount() - timereco) / cv::getTickFrequency();
 	//printf("kcf hog extra time: %f \n", fpseco);
     if (inithann)
@@ -783,7 +797,7 @@ void KCFTracker::train_dsst(cv::Mat image, bool ini)
     // Get Sigma{FF} in the paper (delta B)
     cv::Mat new_den_dsst;
     cv::mulSpectrums(samples, samples, new_den_dsst, 0, true);
-    cv::reduce(real(new_den_dsst), new_den_dsst, 0, CV_REDUCE_SUM);
+    cv::reduce(real(new_den_dsst), new_den_dsst, 0,cv::REDUCE_SUM /* CV_REDUCE_SUM */);
 
     if (ini)
     {
@@ -806,7 +820,7 @@ cv::Point2i KCFTracker::detect_dsst(cv::Mat image)
 
     // Compute AZ in the paper
     cv::Mat add_temp;
-    cv::reduce(complexDotMultiplication(_num_dsst, samples), add_temp, 0, CV_REDUCE_SUM);
+    cv::reduce(complexDotMultiplication(_num_dsst, samples), add_temp, 0, cv::REDUCE_SUM);
 
     // compute the final y, DSST (6);
     cv::Mat scale_response;
@@ -863,8 +877,8 @@ cv::Mat KCFTracker::get_sample_dsst(const cv::Mat &image)
         //printf("%d, %d \n", im_patch_resized.cols, im_patch_resized.rows);
         //printf("%d, %d \n", im_patch.cols, im_patch.rows);
         // Compute the FHOG features for the subwindow
-        IplImage im_ipl = im_patch_resized;
-        getFeatureMaps(&im_ipl, cell_size, &map[i]);
+        cv::Mat im_ipl = im_patch_resized;
+        getFeatureMaps(im_ipl, cell_size, &map[i]);
         normalizeAndTruncate(map[i], 0.2f);
         PCAFeatureMaps(map[i]);
 

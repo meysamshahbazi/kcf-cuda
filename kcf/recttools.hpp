@@ -45,11 +45,11 @@ the use of this software, even if advised of the possibility of such damage.
 namespace kcf
 {
 
-template <typename t>
-inline cv::Vec<t, 2 > center(const cv::Rect_<t> &rect)
-{
-    return cv::Vec<t, 2 > (rect.x + rect.width / (t) 2, rect.y + rect.height / (t) 2);
-}
+// template <typename t>
+// inline cv::Vec<t, 2 > center(const cv::Rect_<t> &rect)
+// {
+//     return cv::Vec<t, 2 > (rect.x + rect.width / (t) 2, rect.y + rect.height / (t) 2);
+// }
 
 template <typename t>
 inline t x2(const cv::Rect_<t> &rect)

@@ -36,7 +36,7 @@ SET(APP_SOURCES
         fhog.cpp  
         kcftracker.cpp  
         runkcftracker.cpp  
-        vot_kcf.cpp
+        # vot_kcf.cpp
         ${APP_HEADERS}
         )
 

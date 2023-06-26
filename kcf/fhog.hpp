@@ -55,7 +55,7 @@
 //#include "_lsvmc_error.h"
 //#include "_lsvmc_routine.h"
 
-//#include "opencv2/imgproc.hpp"
+#include "opencv2/imgproc.hpp"
 #include "opencv2/imgproc/imgproc_c.h"
 
 namespace kcf
