@@ -78,7 +78,7 @@ namespace kcf
 // RESULT
 // Error status
 */
-int getFeatureMaps(const IplImage* image, const int k, CvLSVMFeatureMapCaskade **map)
+int getFeatureMaps(cv::Mat &image, const int k, CvLSVMFeatureMapCaskade **map)
 {
     int sizeX, sizeY;
     int p, px, stringSize;

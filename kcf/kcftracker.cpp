@@ -596,9 +596,9 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat &image, bool inithann, float scale
     // HOG features
     if (_hogfeatures)
     {
-        IplImage z_ipl = z;
+        cv::Mat z_ipl = z;
         CvLSVMFeatureMapCaskade *map;
-        getFeatureMaps(&z_ipl, cell_size, &map);
+        getFeatureMaps(z_ipl, cell_size, &map);
         normalizeAndTruncate(map, 0.2f);
         PCAFeatureMaps(map);
         _size_patch[0] = map->sizeY;
