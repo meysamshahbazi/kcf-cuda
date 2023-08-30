@@ -25,6 +25,9 @@ public:
 
     CVKCF();
     ~CVKCF();
+
+    void setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func = false);
+    
     void init(cv::InputArray image, const cv::Rect& boundingBox);
     bool update(cv::InputArray image, cv::Rect& boundingBox);
 private:
@@ -98,8 +101,8 @@ private:
     // storage of the extracted features
     std::vector<Mat> features_pca;
     std::vector<Mat> features_npca;
-    // std::vector<MODE> descriptors_pca;
-    // std::vector<MODE> descriptors_npca;
+    std::vector<MODE> descriptors_pca;
+    std::vector<MODE> descriptors_npca;
 
     // optimization variables for updateProjectionMatrix
     Mat data_pca, new_covar,w_data,u_data,vt_data;

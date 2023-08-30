@@ -29,7 +29,7 @@ CVKCF::CVKCF()
 * - perform FFT to the gaussian response
 */
 void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
-  {
+{
     frame = 0;
     roi.x = cvRound(boundingBox.x);
     roi.y = cvRound(boundingBox.y);
@@ -37,11 +37,11 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     roi.height = cvRound(boundingBox.height);
 
     //calclulate output sigma
-    output_sigma=std::sqrt(static_cast<float>(roi.width*roi.height))*params.output_sigma_factor;
+    output_sigma=std::sqrt(static_cast<float>(roi.width*roi.height))*output_sigma_factor;
     output_sigma=-0.5f/(output_sigma*output_sigma);
 
     //resize the ROI whenever needed
-    if(params.resize && roi.width*roi.height>params.max_patch_size){
+    if(resize && roi.width*roi.height>max_patch_size){
       resizeImage=true;
       roi.x/=2.0;
       roi.y/=2.0;
@@ -78,29 +78,29 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     fft2(y,yf);
 
     if (image.channels() == 1) { // disable CN for grayscale images
-      params.desc_pca &= ~(CN);
-      params.desc_npca &= ~(CN);
+      desc_pca &= ~(CN);
+      desc_npca &= ~(CN);
     }
     // model = makePtr<TrackerKCFModel>();
 
     // record the non-compressed descriptors
-    if((params.desc_npca & GRAY) == GRAY)descriptors_npca.push_back(GRAY);
-    if((params.desc_npca & CN) == CN)descriptors_npca.push_back(CN);
+    if((desc_npca & GRAY) == GRAY)descriptors_npca.push_back(GRAY);
+    if((desc_npca & CN) == CN)descriptors_npca.push_back(CN);
     if(use_custom_extractor_npca)descriptors_npca.push_back(CUSTOM);
     features_npca.resize(descriptors_npca.size());
 
     // record the compressed descriptors
-    if((params.desc_pca & GRAY) == GRAY)descriptors_pca.push_back(GRAY);
-    if((params.desc_pca & CN) == CN)descriptors_pca.push_back(CN);
+    if((desc_pca & GRAY) == GRAY)descriptors_pca.push_back(GRAY);
+    if((desc_pca & CN) == CN)descriptors_pca.push_back(CN);
     if(use_custom_extractor_pca)descriptors_pca.push_back(CUSTOM);
     features_pca.resize(descriptors_pca.size());
 
     // accept only the available descriptor modes
     CV_Assert(
-      (params.desc_pca & GRAY) == GRAY
-      || (params.desc_npca & GRAY) == GRAY
-      || (params.desc_pca & CN) == CN
-      || (params.desc_npca & CN) == CN
+      (desc_pca & GRAY) == GRAY
+      || (desc_npca & GRAY) == GRAY
+      || (desc_pca & CN) == CN
+      || (desc_npca & CN) == CN
       || use_custom_extractor_pca
       || use_custom_extractor_npca
     );
@@ -154,7 +154,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
       if(features_pca.size()>0)merge(features_pca,X[0]);
 
       //compress the features and the KRSL model
-      if(params.desc_pca !=0){
+      if(desc_pca !=0){
         compress(proj_mtx,X[0],X[0],data_temp,compress_data);
         compress(proj_mtx,Z[0],Zc[0],data_temp,compress_data);
       }
@@ -175,21 +175,21 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
       }
 
       //compute the gaussian kernel
-      denseGaussKernel(params.sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+      denseGaussKernel(sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
 
       // compute the fourier transform of the kernel
       fft2(k,kf);
       if(frame==1)spec2=Mat_<Vec2f >(kf.rows, kf.cols);
 
       // calculate filter response
-      if(params.split_coeff)
+      if(split_coeff)
         calcResponse(alphaf,alphaf_den,kf,response, spec, spec2);
       else
         calcResponse(alphaf,kf,response, spec);
 
       // extract the maximum response
       minMaxLoc( response, &minVal, &maxVal, &minLoc, &maxLoc );
-      if (maxVal < params.detect_thresh)
+      if (maxVal < detect_thresh)
       {
           return false;
       }
@@ -230,11 +230,11 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
       Z[0] = X[0].clone();
       Z[1] = X[1].clone();
     }else{
-      Z[0]=(1.0-params.interp_factor)*Z[0]+params.interp_factor*X[0];
-      Z[1]=(1.0-params.interp_factor)*Z[1]+params.interp_factor*X[1];
+      Z[0]=(1.0-interp_factor)*Z[0]+interp_factor*X[0];
+      Z[1]=(1.0-interp_factor)*Z[1]+interp_factor*X[1];
     }
 
-    if(params.desc_pca !=0 || use_custom_extractor_pca){
+    if(desc_pca !=0 || use_custom_extractor_pca){
       // initialize the vector of Mat variables
       if(frame==0){
         layers_pca_data.resize(Z[0].channels());
@@ -242,7 +242,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
       }
 
       // feature compression
-      updateProjectionMatrix(Z[0],old_cov_mtx,proj_mtx,params.pca_learning_rate,params.compressed_size,layers_pca_data,average_data,data_pca, new_covar,w_data,u_data,vt_data);
+      updateProjectionMatrix(Z[0],old_cov_mtx,proj_mtx,pca_learning_rate,compressed_size,layers_pca_data,average_data,data_pca, new_covar,w_data,u_data,vt_data);
       compress(proj_mtx,X[0],X[0],data_temp,compress_data);
     }
 
@@ -264,14 +264,14 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     }
 
     // Kernel Regularized Least-Squares, calculate alphas
-    denseGaussKernel(params.sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+    denseGaussKernel(sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
 
     // compute the fourier transform of the kernel and add a small value
     fft2(k,kf);
-    kf_lambda=kf+params.lambda;
+    kf_lambda=kf+lambda;
 
     float den;
-    if(params.split_coeff){
+    if(split_coeff){
       mulSpectrums(yf,kf,new_alphaf,0);
       mulSpectrums(kf,kf_lambda,new_alphaf_den,0);
     }else{
@@ -290,10 +290,10 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     // update the RLS model
     if(frame==0){
       alphaf=new_alphaf.clone();
-      if(params.split_coeff)alphaf_den=new_alphaf_den.clone();
+      if(split_coeff)alphaf_den=new_alphaf_den.clone();
     }else{
-      alphaf=(1.0-params.interp_factor)*alphaf+params.interp_factor*new_alphaf;
-      if(params.split_coeff)alphaf_den=(1.0-params.interp_factor)*alphaf_den+params.interp_factor*new_alphaf_den;
+      alphaf=(1.0-interp_factor)*alphaf+interp_factor*new_alphaf;
+      if(split_coeff)alphaf_den=(1.0-interp_factor)*alphaf_den+interp_factor*new_alphaf_den;
     }
 
     frame++;
@@ -315,7 +315,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * hann window filter
    */
-  void TrackerKCFImpl::createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const {
+  void CVKCF::createHanningWindow(OutputArray dest, const cv::Size winSize, const int type) const {
       CV_Assert( type == CV_32FC1 || type == CV_64FC1 );
 
       dest.create(winSize, type);
@@ -354,11 +354,11 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * simplification of fourier transform function in opencv
    */
-  void inline TrackerKCFImpl::fft2(const Mat src, Mat & dest) const {
+  void inline CVKCF::fft2(const Mat src, Mat & dest) const {
     dft(src,dest,DFT_COMPLEX_OUTPUT);
   }
 
-  void inline TrackerKCFImpl::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
+  void inline CVKCF::fft2(const Mat src, std::vector<Mat> & dest, std::vector<Mat> & layers_data) const {
     split(src, layers_data);
 
     for(int i=0;i<src.channels();i++){
@@ -369,14 +369,14 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * simplification of inverse fourier transform function in opencv
    */
-  void inline TrackerKCFImpl::ifft2(const Mat src, Mat & dest) const {
+  void inline CVKCF::ifft2(const Mat src, Mat & dest) const {
     idft(src,dest,DFT_SCALE+DFT_REAL_OUTPUT);
   }
 
   /*
    * Point-wise multiplication of two Multichannel Mat data
    */
-  void inline TrackerKCFImpl::pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB) const {
+  void inline CVKCF::pixelWiseMult(const std::vector<Mat> src1, const std::vector<Mat>  src2, std::vector<Mat>  & dest, const int flags, const bool conjB) const {
     for(unsigned i=0;i<src1.size();i++){
       mulSpectrums(src1[i], src2[i], dest[i],flags,conjB);
     }
@@ -385,7 +385,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * Combines all channels in a multi-channels Mat data into a single channel
    */
-  void inline TrackerKCFImpl::sumChannels(std::vector<Mat> src, Mat & dest) const {
+  void inline CVKCF::sumChannels(std::vector<Mat> src, Mat & dest) const {
     dest=src[0].clone();
     for(unsigned i=1;i<src.size();i++){
       dest+=src[i];
@@ -393,7 +393,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   }
 
 #ifdef HAVE_OPENCL
-  bool inline TrackerKCFImpl::oclTransposeMM(const Mat src, float alpha, UMat &dst){
+  bool inline CVKCF::oclTransposeMM(const Mat src, float alpha, UMat &dst){
     // Current kernel only support matrix's rows is multiple of 4.
     // And if one line is less than 512KB, CPU will likely be faster.
     if (transpose_mm_ker.empty() ||
@@ -421,7 +421,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * obtains the projection matrix using PCA
    */
-  void inline TrackerKCFImpl::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, float pca_rate, int compressed_sz,
+  void inline CVKCF::updateProjectionMatrix(const Mat src, Mat & old_cov,Mat &  proj_matrix, float pca_rate, int compressed_sz,
                                                      std::vector<Mat> & layers_pca,std::vector<Scalar> & average, Mat pca_data, Mat new_cov, Mat w, Mat u, Mat vt) {
     CV_Assert(compressed_sz<=src.channels());
 
@@ -479,7 +479,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * compress the features
    */
-  void inline TrackerKCFImpl::compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const {
+  void inline CVKCF::compress(const Mat proj_matrix, const Mat src, Mat & dest, Mat & data, Mat & compressed) const {
     data=src.reshape(1,src.rows*src.cols);
     compressed=data*proj_matrix;
     dest=compressed.reshape(proj_matrix.cols,src.rows).clone();
@@ -488,7 +488,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * obtain the patch and apply hann window filter to it
    */
-  bool TrackerKCFImpl::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, TrackerKCF::MODE desc) const {
+  bool CVKCF::getSubWindow(const Mat img, const Rect _roi, Mat& feat, Mat& patch, MODE desc) const {
 
     Rect region=_roi;
 
@@ -543,41 +543,41 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
 
   }
 
-  /*
-   * get feature using external function
-   */
-  bool TrackerKCFImpl::getSubWindow(const Mat img, const Rect _roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const{
+/*
+* get feature using external function
+*/
+bool CVKCF::getSubWindow(const Mat img, const Rect _roi, Mat& feat, void (*f)(const Mat, const Rect, Mat& )) const{
 
     // return false if roi is outside the image
     if((_roi.x+_roi.width<0)
-      ||(_roi.y+_roi.height<0)
-      ||(_roi.x>=img.cols)
-      ||(_roi.y>=img.rows)
+        ||(_roi.y+_roi.height<0)
+        ||(_roi.x>=img.cols)
+        ||(_roi.y>=img.rows)
     )return false;
 
     f(img, _roi, feat);
 
     if(_roi.width != feat.cols || _roi.height != feat.rows){
-      printf("error in customized function of features extractor!\n");
-      printf("Rules: roi.width==feat.cols && roi.height = feat.rows \n");
+        printf("error in customized function of features extractor!\n");
+        printf("Rules: roi.width==feat.cols && roi.height = feat.rows \n");
     }
 
     Mat hann_win;
     std::vector<Mat> _layers;
 
     for(int i=0;i<feat.channels();i++)
-      _layers.push_back(hann);
+        _layers.push_back(hann);
 
     merge(_layers, hann_win);
 
     feat=feat.mul(hann_win); // hann window filter
 
     return true;
-  }
+}
 
   /* Convert BGR to ColorNames
    */
-  void TrackerKCFImpl::extractCN(Mat patch_data, Mat & cnFeatures) const {
+  void CVKCF::extractCN(Mat patch_data, Mat & cnFeatures) const {
     Vec3b & pixel = patch_data.at<Vec3b>(0,0);
     unsigned index;
 
@@ -590,8 +590,8 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
         index=(unsigned)(floor((float)pixel[2]/8)+32*floor((float)pixel[1]/8)+32*32*floor((float)pixel[0]/8));
 
         //copy the values
-        for(int _k=0;_k<10;_k++){
-          cnFeatures.at<Vec<float,10> >(i,j)[_k]=ColorNames[index][_k];
+        for(int _k=0;_k<10;_k++){ // TODO: add ColorNames if needed!
+          cnFeatures.at<Vec<float,10> >(i,j)[_k]= 0; //ColorNames[index][_k];
         }
       }
     }
@@ -601,7 +601,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    *  dense gauss kernel function
    */
-  void TrackerKCFImpl::denseGaussKernel(const float sigma, const Mat x_data, const Mat y_data, Mat & k_data,
+  void CVKCF::denseGaussKernel(const float sigma, const Mat x_data, const Mat y_data, Mat & k_data,
                                         std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) const {
     double normX, normY;
 
@@ -617,7 +617,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     sumChannels(xyf_v,xyf);
     ifft2(xyf,xyf);
 
-    if(params.wrap_kernel){
+    if(wrap_kernel){
       shiftRows(xyf, x_data.rows/2);
       shiftCols(xyf, x_data.cols/2);
     }
@@ -643,7 +643,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
    * http://stackoverflow.com/questions/10420454/shift-like-matlab-function-rows-or-columns-of-a-matrix-in-opencv
    */
   // circular shift one row from up to down
-  void TrackerKCFImpl::shiftRows(Mat& mat) const {
+  void CVKCF::shiftRows(Mat& mat) const {
 
       Mat temp;
       Mat m;
@@ -659,7 +659,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   }
 
   // circular shift n rows from up to down if n > 0, -n rows from down to up if n < 0
-  void TrackerKCFImpl::shiftRows(Mat& mat, int n) const {
+  void CVKCF::shiftRows(Mat& mat, int n) const {
       if( n < 0 ) {
         n = -n;
         flip(mat,mat,0);
@@ -675,7 +675,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   }
 
   //circular shift n columns from left to right if n > 0, -n columns from right to left if n < 0
-  void TrackerKCFImpl::shiftCols(Mat& mat, int n) const {
+  void CVKCF::shiftCols(Mat& mat, int n) const {
       if(n < 0){
         n = -n;
         flip(mat,mat,1);
@@ -693,7 +693,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * calculate the detection response
    */
-  void TrackerKCFImpl::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const {
+  void CVKCF::calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const {
     //alpha f--> 2channels ; k --> 1 channel;
     mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
     ifft2(spec_data,response_data);
@@ -702,7 +702,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
   /*
    * calculate the detection response for splitted form
    */
-  void TrackerKCFImpl::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const {
+  void CVKCF::calcResponse(const Mat alphaf_data, const Mat _alphaf_den, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const {
 
     mulSpectrums(alphaf_data,kf_data,spec_data,0,false);
 
@@ -721,7 +721,7 @@ void CVKCF::init(cv::InputArray image, const Rect& boundingBox)
     ifft2(spec2_data,response_data);
   }
 
-  void TrackerKCFImpl::setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func){
+  void CVKCF::setFeatureExtractor(void (*f)(const Mat, const Rect, Mat&), bool pca_func){
     if(pca_func){
       extractor_pca.push_back(f);
       use_custom_extractor_pca = true;
