@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     //imshow("OpenTracker", frameDraw);
     //waitKey(0);
     // Create KCFTracker:
-    bool HOG = true, FIXEDWINDOW = true, MULTISCALE = true, LAB = true, DSST = false; //LAB color space features
+    bool HOG = true, FIXEDWINDOW = true, MULTISCALE = false, LAB = false, DSST = false; //LAB color space features
     KCFTracker kcftracker(HOG, FIXEDWINDOW, MULTISCALE, LAB, DSST);
     Rect2d kcfbbox((int)bboxGroundtruth.x, (int)bboxGroundtruth.y, (int)bboxGroundtruth.width, (int)bboxGroundtruth.height);
     
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
         float fpskcf = getTickFrequency() / ((double)getTickCount() - timerkcf);
         if (okkcf)
         {
-            cout<<"okkcf"<<endl;
+            // cout<<"okkcf"<<endl;
             rectangle(frameDraw, kcfbbox, Scalar(0, 255, 0), 2, 1);
         }
         else
@@ -115,15 +115,15 @@ int main(int argc, char **argv)
         double timerdsst = (double)getTickCount();
         bool okdsst = dssttracker.update(frame, dsstbbox);
         float fpsdsst = getTickFrequency() / ((double)getTickCount() - timerdsst);
-        if (okdsst)
-        {
-            rectangle(frameDraw, dsstbbox, Scalar(0, 0, 255), 2, 1);
-        }
-        else
-        {
-            putText(frameDraw, "DSST tracking failure detected", cv::Point(10, 100), FONT_HERSHEY_SIMPLEX,
-                    0.75, Scalar(0, 0, 255), 2);
-        }
+        // if (okdsst)
+        // {
+        //     rectangle(frameDraw, dsstbbox, Scalar(0, 0, 255), 2, 1);
+        // }
+        // else
+        // {
+        //     putText(frameDraw, "DSST tracking failure detected", cv::Point(10, 100), FONT_HERSHEY_SIMPLEX,
+        //             0.75, Scalar(0, 0, 255), 2);
+        // }
         
         // Display FPS on frameDraw
         ostringstream os; 
@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 
         imshow("OpenTracker", frameDraw);
         
-        int c = cv::waitKey(30);
+        int c = cv::waitKey(1);
         if (c != -1)
             c = c % 256;
         if (c == 27)
